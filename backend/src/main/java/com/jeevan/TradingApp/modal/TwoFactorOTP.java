@@ -6,15 +6,15 @@ import jakarta.persistence.Id;
 import jakarta.persistence.OneToOne;
 import lombok.Data;
 
-@Entity
+import java.io.Serializable;
+
 @Data
-public class TwoFactorOTP {
-    @Id
+public class TwoFactorOTP implements Serializable {
     private String id;
     private String otp;
-    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
-    @OneToOne
-    private User user;
     @JsonProperty(access  = JsonProperty.Access.WRITE_ONLY)
     private String jwt;
+    
+    // Instead of full User entity, we only need the user ID
+    private Long userId;
 }

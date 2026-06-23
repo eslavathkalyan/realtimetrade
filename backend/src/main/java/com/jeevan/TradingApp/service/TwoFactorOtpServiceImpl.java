@@ -2,17 +2,22 @@ package com.jeevan.TradingApp.service;
 
 import com.jeevan.TradingApp.modal.TwoFactorOTP;
 import com.jeevan.TradingApp.modal.User;
-import com.jeevan.TradingApp.repository.TwoFactorOtpRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
-import javax.swing.text.html.Option;
-import java.util.Optional;
+import java.time.Duration;
 import java.util.UUID;
+
 @Service
-public class TwoFactorOtpServiceImpl implements  TwoFactorOtpService{
+public class TwoFactorOtpServiceImpl implements TwoFactorOtpService {
+    
     @Autowired
-    private TwoFactorOtpRepository twoFactorOtpRepository;
+    private RedisTemplate<String, Object> redisTemplate;
+
+    private static final String OTP_PREFIX_USER = "otp:user:";
+    private static final String OTP_PREFIX_ID = "otp:id:";
+
     @Override
     public TwoFactorOTP createTwoFactorOtp(User user, String otp, String jwt) {
         UUID uuid = UUID.randomUUID();
@@ -21,19 +26,27 @@ public class TwoFactorOtpServiceImpl implements  TwoFactorOtpService{
         twoFactorOTP.setOtp(otp);
         twoFactorOTP.setJwt(jwt);
         twoFactorOTP.setId(id);
-        twoFactorOTP.setUser(user);
-        return twoFactorOtpRepository.save(twoFactorOTP);
+        twoFactorOTP.setUserId(user.getId());
+
+        // Save to Redis with 5 minutes TTL
+        redisTemplate.opsForValue().set(OTP_PREFIX_ID + id, twoFactorOTP, Duration.ofMinutes(5));
+        redisTemplate.opsForValue().set(OTP_PREFIX_USER + user.getId(), id, Duration.ofMinutes(5));
+
+        return twoFactorOTP;
     }
 
     @Override
     public TwoFactorOTP findByUser(Long userId) {
-        return twoFactorOtpRepository.findByUserId(userId);
+        String id = (String) redisTemplate.opsForValue().get(OTP_PREFIX_USER + userId);
+        if (id != null) {
+            return findById(id);
+        }
+        return null;
     }
 
     @Override
-    public TwoFactorOTP findById(String Id) {
-        Optional<TwoFactorOTP>  opt = twoFactorOtpRepository.findById(Id);
-        return opt.orElse(null);
+    public TwoFactorOTP findById(String id) {
+        return (TwoFactorOTP) redisTemplate.opsForValue().get(OTP_PREFIX_ID + id);
     }
 
     @Override
@@ -43,6 +56,7 @@ public class TwoFactorOtpServiceImpl implements  TwoFactorOtpService{
 
     @Override
     public void deleteTwoFactorOtp(TwoFactorOTP twoFactorOTP) {
-        twoFactorOtpRepository.delete(twoFactorOTP);
+        redisTemplate.delete(OTP_PREFIX_ID + twoFactorOTP.getId());
+        redisTemplate.delete(OTP_PREFIX_USER + twoFactorOTP.getUserId());
     }
 }
