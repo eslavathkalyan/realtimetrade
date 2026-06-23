@@ -18,7 +18,7 @@ WORKDIR /app
 COPY --from=build /app/target/TradingApp-0.0.1-SNAPSHOT.jar app.jar
 
 # Optional credentials directory (local only)
-COPY credentials /app/credentials
+COPY credentials* /app/credentials/
 
 # Expose backend port inside container
 EXPOSE 8081
